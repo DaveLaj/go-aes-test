@@ -18,13 +18,11 @@ import (
 
 type RequestToDecrypt struct {
 	ToDecrypt string `json:"toDecrypt" binding:"required"`
+	Key       string `json:"key" binding:"required"`
+	Nonce     string `json:"nonce" binding:"required"`
 }
 
 func main() {
-	err := CreateAESKeytoPemFile(byte16, "aes.pem")
-	if err != nil {
-		log.Println("Error creating AES key: ", err)
-	}
 	router := gin.Default()
 
 	router.POST("/encryptAES", func(c *gin.Context) {
@@ -60,7 +58,6 @@ func main() {
 		if err != nil {
 			log.Println("Error encrypting: ", err)
 		}
-		fmt.Println(ciphertext)
 		base64CipherText := base64.StdEncoding.EncodeToString(ciphertext)
 		c.JSON(200, gin.H{"encrypted": base64CipherText})
 	})
@@ -73,12 +70,29 @@ func main() {
 			c.JSON(400, gin.H{"error": "Invalid request"})
 			return
 		}
-		key, err := ReadAESKeyFromPemFile("aes.pem")
+		fmt.Println("Nonce:", request.Nonce)
+		fmt.Println("Key:", request.Key)
+		fmt.Println("ToDecrypt:", request.ToDecrypt)
+		// Get key from aes.pem
+		// key, err := ReadAESKeyFromPemFile("aes.pem")
+		// if err != nil {
+		// 	log.Println("Error reading AES key: ", err)
+		// 	c.JSON(500, gin.H{"error": "Internal server error"})
+		// 	return
+		// }
+		nonce, err := base64.StdEncoding.DecodeString(request.Nonce)
 		if err != nil {
-			log.Println("Error reading AES key: ", err)
-			c.JSON(500, gin.H{"error": "Internal server error"})
+			log.Println("Error decoding nonce: ", err)
+			c.JSON(400, gin.H{"error": "Invalid base64"})
 			return
 		}
+		key, err := base64.StdEncoding.DecodeString(request.Key)
+		if err != nil {
+			log.Println("Error decoding base64 on key: ", err)
+			c.JSON(400, gin.H{"error": "Invalid base64"})
+			return
+		}
+
 		aesCipher, err := aes.NewCipher(key)
 		if err != nil {
 			log.Println("Error creating AES cipher: ", err)
@@ -86,21 +100,27 @@ func main() {
 		}
 
 		decodedCipherText, err := base64.StdEncoding.DecodeString(request.ToDecrypt)
-		fmt.Println(decodedCipherText)
 		if err != nil {
 			log.Println("Error decoding base64: ", err)
 			c.JSON(400, gin.H{"error": "Invalid base64"})
 			return
 		}
-		decryptedDataInBytes, err := AESDecryptWithGCM(decodedCipherText, aesCipher)
+
+		decryptedDataInBytes, err := FlutterAESDecryptWithGCM(decodedCipherText, aesCipher, nonce)
 		if err != nil {
 			log.Println("Error decrypting: ", err)
-		}
-		var decryptedBody map[string]interface{}
-		if err := json.Unmarshal(decryptedDataInBytes, &decryptedBody); err != nil {
 			c.JSON(500, gin.H{
 				"message": err.Error(),
 			})
+			return
+		}
+		fmt.Println("decryptedDataInBytes: ", decryptedDataInBytes)
+		var decryptedBody map[string]interface{}
+		if err := json.Unmarshal(decryptedDataInBytes, &decryptedBody); err != nil {
+			c.JSON(500, gin.H{
+				"messageJson": err.Error(),
+			})
+			return
 		}
 		c.Set("decryptedPayloadAsMap", decryptedBody)
 		c.Set("decryptedPayloadAsBytes", decryptedDataInBytes)
@@ -112,7 +132,7 @@ func main() {
 		c.AbortWithStatusJSON(200, decryptedPayloadAsMap)
 	})
 
-	err = router.Run(":8080")
+	err := router.Run(":8080")
 	if err != nil {
 		log.Println("Error starting server: ", err)
 	}
