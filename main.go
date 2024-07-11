@@ -20,6 +20,7 @@ type RequestToDecrypt struct {
 	ToDecrypt string `json:"toDecrypt" binding:"required"`
 	Key       string `json:"key" binding:"required"`
 	Nonce     string `json:"nonce" binding:"required"`
+	MAC       string `json:"mac" binding:"required"`
 }
 
 func main() {
@@ -73,6 +74,7 @@ func main() {
 		fmt.Println("Nonce:", request.Nonce)
 		fmt.Println("Key:", request.Key)
 		fmt.Println("ToDecrypt:", request.ToDecrypt)
+		fmt.Println("MAC:", request.MAC)
 		// Get key from aes.pem
 		// key, err := ReadAESKeyFromPemFile("aes.pem")
 		// if err != nil {
@@ -80,33 +82,38 @@ func main() {
 		// 	c.JSON(500, gin.H{"error": "Internal server error"})
 		// 	return
 		// }
+		// Load nonce from request
 		nonce, err := base64.StdEncoding.DecodeString(request.Nonce)
 		if err != nil {
 			log.Println("Error decoding nonce: ", err)
 			c.JSON(400, gin.H{"error": "Invalid base64"})
 			return
 		}
+		// Load key from request
 		key, err := base64.StdEncoding.DecodeString(request.Key)
 		if err != nil {
 			log.Println("Error decoding base64 on key: ", err)
 			c.JSON(400, gin.H{"error": "Invalid base64"})
 			return
 		}
-
+		// Create AES cipher
 		aesCipher, err := aes.NewCipher(key)
 		if err != nil {
 			log.Println("Error creating AES cipher: ", err)
 			return
 		}
-
 		decodedCipherText, err := base64.StdEncoding.DecodeString(request.ToDecrypt)
 		if err != nil {
 			log.Println("Error decoding base64: ", err)
 			c.JSON(400, gin.H{"error": "Invalid base64"})
 			return
 		}
-
-		decryptedDataInBytes, err := FlutterAESDecryptWithGCM(decodedCipherText, aesCipher, nonce)
+		decodedMAC, err := base64.StdEncoding.DecodeString(request.MAC)
+		if err != nil {
+			log.Println("Error decoding base64 (MAC): ", err)
+			c.JSON(400, gin.H{"error": "Invalid base64"})
+		}
+		decryptedDataInBytes, err := FlutterAESDecryptWithGCM(decodedCipherText, aesCipher, nonce, decodedMAC)
 		if err != nil {
 			log.Println("Error decrypting: ", err)
 			c.JSON(500, gin.H{

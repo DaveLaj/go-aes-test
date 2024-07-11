@@ -88,12 +88,13 @@ func AESDecryptWithGCM(ciphertext []byte, aes cipher.Block) (plaintext []byte, e
 	return decrypted, nil
 }
 
-func FlutterAESDecryptWithGCM(ciphertext []byte, aes cipher.Block, nonce []byte) (plaintext []byte, err error) {
+func FlutterAESDecryptWithGCM(ciphertext []byte, aes cipher.Block, nonce []byte, mac []byte) (plaintext []byte, err error) {
 	gcm, err := cipher.NewGCM(aes)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create new gcm: %w", err)
 	}
 
+	ciphertext = append(ciphertext, mac...)
 	decrypted, err := gcm.Open(nil, nonce, ciphertext, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error opening and authenticating ciphertext: %w", err)
@@ -101,7 +102,6 @@ func FlutterAESDecryptWithGCM(ciphertext []byte, aes cipher.Block, nonce []byte)
 
 	return decrypted, nil
 }
-
 func ReadAESKeyFromPemFile(filename string) (key []byte, err error) {
 	data, err := os.ReadFile(filename)
 	if err != nil {
