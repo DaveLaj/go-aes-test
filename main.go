@@ -2,15 +2,10 @@ package main
 
 import (
 	"crypto/aes"
-	_ "crypto/rand"
-	"fmt"
-	"io"
-
-	//"crypto/rsa"
-
 	"encoding/base64"
 	"encoding/json"
-	_ "encoding/json"
+	"fmt"
+	"io"
 	"log"
 
 	"github.com/gin-gonic/gin"
