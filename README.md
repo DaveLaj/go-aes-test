@@ -22,7 +22,7 @@ Please note: I am just sending the key for a future implementation with RSA. (AE
 
 ```json
 {
-    "Data" : "stringToDecrypt",
+    "Data" : "JsonInEncryptedCipherText",
     "Key"  : "aesKey"
 }
 ```
